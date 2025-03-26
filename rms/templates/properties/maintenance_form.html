@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Submit Maintenance Request - RMS{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white py-3">
+                <h4 class="mb-0">Submit Maintenance Request</h4>
+            </div>
+            <div class="card-body p-4">
+                <form method="post" enctype="multipart/form-data" novalidate>
+                    {% csrf_token %}
+                    
+                    <!-- Property Information -->
+                    {% if not form.instance.pk %}
+                        <div class="card mb-4">
+                            <div class="card-body">
+                                <h5 class="card-title">Property Information</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>Property:</strong> {{ property.title }}</p>
+                                        <p><strong>Address:</strong> {{ property.address }}</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p><strong>Unit:</strong> {{ lease.unit_number|default:"N/A" }}</p>
+                                        <p><strong>Tenant:</strong> {{ request.user.get_full_name }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <!-- Request Details -->
+                    <h5 class="mb-4">Request Details</h5>
+                    <div class="mb-3">
+                        {{ form.category|crispy }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.title|crispy }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.description|crispy }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.priority|crispy }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.preferred_time|crispy }}
+                    </div>
+                    <div class="mb-4">
+                        {{ form.images|crispy }}
+                    </div>
+
+                    <!-- Access Instructions -->
+                    <h5 class="mb-4">Access Instructions</h5>
+                    <div class="mb-3">
+                        {{ form.access_instructions|crispy }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.permission_to_enter|crispy }}
+                    </div>
+
+                    <!-- Contact Information -->
+                    <h5 class="mb-4">Contact Information</h5>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.contact_phone|crispy }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.contact_email|crispy }}
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'properties:maintenance_list' %}" class="btn btn-outline-secondary me-2">
+                            Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            Submit Request
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Image preview
+    document.getElementById('id_images').addEventListener('change', function(e) {
+        const previewContainer = document.createElement('div');
+        previewContainer.className = 'row mt-3';
+        
+        for (const file of e.target.files) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const col = document.createElement('div');
+                col.className = 'col-md-4 mb-3';
+                
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'img-thumbnail';
+                img.style.height = '200px';
+                img.style.objectFit = 'cover';
+                
+                col.appendChild(img);
+                previewContainer.appendChild(col);
+            }
+            reader.readAsDataURL(file);
+        }
+        
+        const existingPreview = document.querySelector('.image-preview');
+        if (existingPreview) {
+            existingPreview.remove();
+        }
+        
+        previewContainer.className = 'row mt-3 image-preview';
+        this.parentElement.appendChild(previewContainer);
+    });
+
+    // Priority color indicator
+    document.getElementById('id_priority').addEventListener('change', function(e) {
+        const priorityField = e.target;
+        const priorityValue = priorityField.value;
+        
+        // Remove existing classes
+        priorityField.classList.remove('border-success', 'border-warning', 'border-danger');
+        
+        // Add appropriate class based on priority
+        switch(priorityValue) {
+            case 'low':
+                priorityField.classList.add('border-success');
+                break;
+            case 'medium':
+                priorityField.classList.add('border-warning');
+                break;
+            case 'high':
+                priorityField.classList.add('border-danger');
+                break;
+        }
+    });
+</script>
+{% endblock %}

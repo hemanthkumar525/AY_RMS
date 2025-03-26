@@ -1,0 +1,594 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Property Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ property.title }}</h2>
+        <a href="{% url 'properties:property_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Properties
+        </a>
+    </div>
+
+    <!-- Property Details Card -->
+    <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Property Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Address:</strong> {{ property.address }}</p>
+                    <p><strong>Availability:</strong> 
+                        <span class="badge bg-{% if property.is_available %}success{% else %}danger{% endif %}">
+                            {{ property.is_available|yesno:"Available,Occupied" }}
+                        </span>
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Total Units:</strong> {{ property.units.count }}</p>
+                    <p><strong>Active Leases:</strong> {{ property.active_leases_count }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tenant Section -->
+    <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Tenants</h5>
+            {% if request.user.is_property_owner and property.owner.user == request.user %}
+            <button type="button" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#addTenantModal">
+                <i class="fas fa-user-plus"></i> Add Tenant
+            </button>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if property.property_tenants.exists %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Status</th>
+                                <th>Start Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tenant_property in property.property_tenants.all %}
+                            <tr>
+                                <td>{{ tenant_property.tenant.user.get_full_name }}</td>
+                                <td>{{ tenant_property.tenant.user.email }}</td>
+                                <td>{{ tenant_property.tenant.user.phone_number }}</td>
+                                <td>
+                                    <span class="badge {% if tenant_property.status == 'active' %}bg-success{% elif tenant_property.status == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
+                                        {{ tenant_property.status|title }}
+                                    </span>
+                                </td>
+                                <td>{{ tenant_property.start_date|date:"M d, Y" }}</td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{% url 'accounts:tenant_list' %}" class="btn btn-sm btn-info" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% if request.user.is_property_owner and property.owner.user == request.user %}
+                                        <button type="button" class="btn btn-sm btn-warning" title="Change Status">
+                                            <i class="fas fa-exchange-alt"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-danger" title="Remove Tenant">
+                                            <i class="fas fa-user-minus"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-3">
+                    <p class="text-muted mb-0">No tenants registered for this property yet.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Add Tenant Modal -->
+    <div class="modal fade" id="addTenantModal" tabindex="-1" aria-labelledby="addTenantModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addTenantModalLabel">Add New Tenant</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Would you like to register a new tenant for this property?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <a href="{% url 'accounts:register_tenant' property.id %}" class="btn btn-primary">
+                        <i class="fas fa-user-plus"></i> Register New Tenant
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bank Accounts Section -->
+    <div class="card shadow mt-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Payment Accounts</h5>
+            <button type="button" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#bankAccountModal">
+                <i class="fas fa-plus"></i> New Account
+            </button>
+        </div>
+        <div class="card-body">
+            {% if property.bank_accounts.exists %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Account Type</th>
+                                <th>Mode</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for account in property.bank_accounts.all %}
+                            <tr>
+                                <td>{{ account.title }}</td>
+                                <td>{{ account.get_account_type_display }}</td>
+                                <td>
+                                    <span class="badge {% if account.account_mode == 'live' %}bg-success{% else %}bg-warning{% endif %}">
+                                        {{ account.get_account_mode_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge {% if account.status == 'Active' %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ account.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#bankDetailsModal{{ account.id }}">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger delete-account" data-account-id="{{ account.id }}" data-property-id="{{ property.id }}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    No payment accounts found. Add a payment account to start accepting payments.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- New Bank Account Modal -->
+    <div class="modal fade" id="bankAccountModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Add Payment Account</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" action="{% url 'properties:bank_account_create' property.pk %}" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        {% csrf_token %}
+                        <input type="hidden" name="create_bank_account" value="1">
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ bank_form.title|as_crispy_field }}
+                                {{ bank_form.account_type|as_crispy_field }}
+                                {{ bank_form.status|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ bank_form.account_mode|as_crispy_field }}
+                                {{ bank_form.client_id|as_crispy_field }}
+                                {{ bank_form.secret_key|as_crispy_field }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add Account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bank Account Details Modals -->
+    {% for account in property.bank_accounts.all %}
+    <div class="modal fade" id="bankDetailsModal{{ account.id }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Account Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-4">
+                        <h6 class="border-bottom pb-2">Account Information</h6>
+                        <p><strong>Title:</strong> {{ account.title }}</p>
+                        <p><strong>Type:</strong> {{ account.get_account_type_display }}</p>
+                        <p><strong>Mode:</strong> {{ account.get_account_mode_display }}</p>
+                        <p><strong>Status:</strong> {{ account.status }}</p>
+                    </div>
+                    <div class="mb-4">
+                        <h6 class="border-bottom pb-2">API Credentials</h6>
+                        <p><strong>Client ID:</strong> {{ account.client_id }}</p>
+                        <p><strong>Secret Key:</strong> ********</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Units Section -->
+    <div class="card shadow mt-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Property Units</h5>
+            <button type="button" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#unitModal">
+                <i class="fas fa-plus"></i> New Unit
+            </button>
+        </div>
+        <div class="card-body">
+            {% if property.units.exists %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Unit Number</th>
+                                <th>Monthly Rent</th>
+                                <th>Status</th>
+                                <th>Current Tenant</th>
+                                <th>Lease Period</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for unit in property.units.all %}
+                            <tr>
+                                <td>{{ unit.unit_number }}</td>
+                                <td>${{ unit.monthly_rent }}</td>
+                                <td>
+                                    {% if unit.lease_agreements.exists %}
+                                        {% with current_lease=unit.lease_agreements.last %}
+                                            {% if current_lease.status == 'active' %}
+                                                <span class="badge bg-danger">Occupied</span>
+                                            {% elif current_lease.status == 'pending' %}
+                                                <span class="badge bg-warning">Lease Pending</span>
+                                            {% elif current_lease.status == 'terminated' or current_lease.status == 'expired' %}
+                                                <span class="badge bg-success">Available</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% else %}
+                                        <span class="badge bg-success">Available</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if unit.lease_agreements.exists %}
+                                        {% with current_lease=unit.lease_agreements.last %}
+                                            {% if current_lease.status != 'terminated' and current_lease.status != 'expired' %}
+                                                <div class="d-flex align-items-center">
+                                                    <i class="fas fa-user me-2"></i>
+                                                    {{ current_lease.tenant.user.get_first_name }}
+                                                    <span class="ms-2 text-muted small">
+                                                        ({{ current_lease.tenant.user.email }})
+                                                    </span>
+                                                </div>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if unit.lease_agreements.exists %}
+                                        {% with current_lease=unit.lease_agreements.last %}
+                                            {% if current_lease.status != 'terminated' and current_lease.status != 'expired' %}
+                                                <div class="small">
+                                                    <div>From: {{ current_lease.start_date|date:"M d, Y" }}</div>
+                                                    <div>To: {{ current_lease.end_date|date:"M d, Y" }}</div>
+                                                    <div class="text-primary mt-1">
+                                                        <i class="fas fa-calendar-day"></i>
+                                                        Rent Due: Day {{ current_lease.rent_due_day }} of each month
+                                                    </div>
+                                                    <div class="mt-1">
+                                                        <span class="badge {% if current_lease.status == 'active' %}bg-success{% elif current_lease.status == 'pending' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                                            {{ current_lease.status|title }}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{% url 'properties:unit_update' unit_pk=unit.pk %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </a>
+                                        {% if not unit.lease_agreements.exists %}
+                                            <a href="{% url 'properties:unit_delete' unit_pk=unit.pk %}" class="btn btn-sm btn-outline-danger" 
+                                               onclick="return confirm('Are you sure you want to delete this unit?');">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        {% endif %}
+                                        {% if not unit.lease_agreements.exists or unit.lease_agreements.last.status in 'terminated,expired' %}
+                                            <a href="{% url 'properties:lease_agreement_create' property_pk=property.id %}?unit={{ unit.id }}" 
+                                               class="btn btn-sm btn-outline-success">
+                                                <i class="fas fa-file-signature"></i> Create Lease
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-3">
+                    <p class="text-muted mb-0">No units added to this property yet.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- New Unit Modal -->
+    <div class="modal fade" id="unitModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Add New Unit</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" action="{% url 'properties:unit_create' property.pk %}">
+                    <div class="modal-body">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ unit_form.unit_number|as_crispy_field }}
+                                {{ unit_form.monthly_rent|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ unit_form.bedrooms|as_crispy_field }}
+                                {{ unit_form.bathrooms|as_crispy_field }}
+                                {{ unit_form.square_feet|as_crispy_field }}
+                                {{ unit_form.is_available|as_crispy_field }}
+                            </div>
+                        </div>
+            
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add Unit</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lease Agreements Section -->
+    <div class="card shadow mt-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Lease Agreements</h5>
+            <button type="button" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#leaseModal">
+                <i class="fas fa-plus"></i> New Lease
+            </button>
+        </div>
+        <div class="card-body">
+            {% if property.leaseagreement_set.exists %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Tenant</th>
+                                <th>Unit</th>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Monthly Rent</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lease in property.leaseagreement_set.all %}
+                            <tr>
+                                <td>{{ lease.tenant.user.get_full_name }}</td>
+                                <td>{{ lease.property_unit.unit_number }}</td>
+                                <td>{{ lease.start_date }}</td>
+                                <td>{{ lease.end_date }}</td>
+                                <td>${{ lease.monthly_rent }}</td>
+                                <td>
+                                    <span class="badge {% if lease.status == 'active' %}bg-success{% elif lease.status == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
+                                        {{ lease.status|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#leaseDetailsModal{{ lease.id }}">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    {% if lease.status == 'pending' %}
+                                    <button class="btn btn-sm btn-success change-lease-status" data-lease-id="{{ lease.id }}" data-property-id="{{ property.id }}" data-status="active">
+                                        <i class="fas fa-check"></i> Activate
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    No lease agreements found. Create a new lease to get started.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- New Lease Modal -->
+    <div class="modal fade" id="leaseModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Create New Lease Agreement</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" action="{% url 'properties:lease_agreement_create' property_pk=property.id %}" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="mb-3">Property Information</h6>
+                                <p><strong>Property:</strong> {{ property.title }}</p>
+                                {% if unit %}
+                                    <p><strong>Unit:</strong> {{ unit.unit_number }}</p>
+                                    <p><strong>Monthly Rent:</strong> ${{ unit.monthly_rent }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="mb-3">Lease Details</h6>
+                                {{ lease_form|crispy }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary" {% if not has_active_accounts %}disabled{% endif %}>
+                            Create Lease
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lease Details Modals -->
+    {% for lease in property.leaseagreement_set.all %}
+    <div class="modal fade" id="leaseDetailsModal{{ lease.id }}" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Lease Agreement Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Tenant Information</h6>
+                            <p><strong>Name:</strong> {{ lease.tenant.user.get_full_name }}</p>
+                            <p><strong>Email:</strong> {{ lease.tenant.user.email }}</p>
+                            <p><strong>Phone:</strong> {{ lease.tenant.phone_number }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Lease Information</h6>
+                            <p><strong>Unit:</strong> {{ lease.property_unit.unit_number }}</p>
+                            <p><strong>Start Date:</strong> {{ lease.start_date }}</p>
+                            <p><strong>End Date:</strong> {{ lease.end_date }}</p>
+                            <p><strong>Monthly Rent:</strong> ${{ lease.monthly_rent }}</p>
+                            <p><strong>Security Deposit:</strong> ${{ lease.security_deposit }}</p>
+                            <p><strong>Status:</strong> 
+                                <span class="badge {% if lease.status == 'active' %}bg-success{% elif lease.status == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
+                                    {{ lease.status|title }}
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    {% if lease.status == 'active' %}
+                    
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle bank account deletion
+    document.querySelectorAll('.delete-account').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const accountId = this.dataset.accountId;
+            const propertyId = this.dataset.propertyId;
+            
+            if (confirm('Are you sure you want to delete this payment account?')) {
+                fetch(`/properties/${propertyId}/bank-account/${accountId}/delete/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    },
+                }).then(response => {
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        alert('Error deleting payment account');
+                    }
+                });
+            }
+        });
+    });
+
+    // Handle lease status change
+    document.querySelectorAll('.change-lease-status').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const leaseId = this.dataset.leaseId;
+            const propertyId = this.dataset.propertyId;
+            const newStatus = this.dataset.status;
+            
+            if (confirm('Are you sure you want to change the lease status?')) {
+                fetch(`/properties/${propertyId}/lease/${leaseId}/change-status/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        status: newStatus
+                    })
+                }).then(response => {
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        alert('Error changing lease status');
+                    }
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

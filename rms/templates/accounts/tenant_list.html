@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}Tenant List - RMS{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="float-start">Tenants List</h2>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="tenantTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Property</th>
+                            <th>Unit</th>
+                            <th>Emergency Contact</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tenant in tenants %}
+                            <tr>
+                                <td>{{ tenant.user.get_full_name }}</td>
+                                <td>{{ tenant.user.email }}</td>
+                                <td>
+                                    {% with current_lease=tenant.leaseagreement_set.last %}
+                                        {% if current_lease %}
+                                            {{ current_lease.property.title }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                                <td>
+                                    {% with current_lease=tenant.leaseagreement_set.last %}
+                                        {% if current_lease and current_lease.property_unit %}
+                                            {{ current_lease.property_unit.unit_number }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                                <td>{{ tenant.emergency_contact|default:"-" }}</td>
+                                <td>
+                                    <span class="badge {% if tenant.status == 'active' %}bg-success{% elif tenant.status == 'inactive' %}bg-danger{% else %}bg-warning{% endif %}">
+                                        {{ tenant.status|title }}
+                                    </span>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center">No tenants found.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if is_paginated %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                    </li>
+                {% endif %}
+                
+                {% for num in page_obj.paginator.page_range %}
+                    <li class="page-item {% if num == page_obj.number %}active{% endif %}">
+                        <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                    </li>
+                {% endfor %}
+                
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+{% endblock %}

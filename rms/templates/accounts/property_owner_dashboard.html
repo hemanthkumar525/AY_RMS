@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Property Owner Dashboard - Rental Management System{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Overview Stats -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Properties</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ properties.count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-building fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Active Tenants</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_tenants }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-users fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Lease Agreements</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ lease_agreements.count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-file-contract fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Total Payments</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_payments }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Properties and Recent Payments -->
+    <div class="row">
+        <!-- Properties List -->
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">My Properties</h6>
+                    <a href="{% url 'properties:property_create' %}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus fa-sm"></i> Add Property
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table" id="propertiesTable">
+                            <thead>
+                                <tr>
+                                    <th>Property</th>
+                                    <th>Address</th>
+                                    <th>Units</th>
+                                    <th>Occupancy</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for property in properties %}
+                                <tr>
+                                    <td>{{ property.name }}</td>
+                                    <td>{{ property.address }}</td>
+                                    <td>{{ property.units }}</td>
+                                    <td>
+                                        <div class="progress">
+                                            <div class="progress-bar" role="progressbar" 
+                                                style="width: auto" 
+                                                aria-valuenow="{{ property.occupancy_rate }}" 
+                                                aria-valuemin="0" 
+                                                aria-valuemax="100">
+                                                {{ property.occupancy_rate }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="{% url 'properties:property_detail' property.id %}" class="btn btn-sm btn-info">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Payments -->
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Recent Payments</h6>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for payment in recent_payments %}
+                        <div class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ payment.lease_agreement.tenant.user.get_full_name }}</h6>
+                                <small class="text-muted">{{ payment.created_at|date:"M d" }}</small>
+                            </div>
+                            <p class="mb-1">{{ payment.lease_agreement.property.name }}</p>
+                            <small class="text-success">${{ payment.amount }}</small>
+                        </div>
+                        {% empty %}
+                        <div class="text-center text-muted py-3">
+                            <i class="fas fa-info-circle mb-2"></i>
+                            <p>No recent payments</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="text-center mt-3">
+                        <a href="#" class="btn btn-outline-primary btn-sm">
+                            View All Payments
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+    .border-left-primary {
+        border-left: .25rem solid #4e73df!important;
+    }
+    .border-left-success {
+        border-left: .25rem solid #1cc88a!important;
+    }
+    .border-left-info {
+        border-left: .25rem solid #36b9cc!important;
+    }
+    .border-left-warning {
+        border-left: .25rem solid #f6c23e!important;
+    }
+    
+    .progress {
+        height: 20px;
+        background-color: #eaecf4;
+    }
+    
+    .progress-bar {
+        background-color: #4e73df;
+    }
+    
+    .list-group-item {
+        border-left: none;
+        border-right: none;
+    }
+    
+    .list-group-item:first-child {
+        border-top: none;
+    }
+    
+    .list-group-item:last-child {
+        border-bottom: none;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        $('#propertiesTable').DataTable({
+            "order": [[0, "asc"]],
+            "pageLength": 5,
+            "language": {
+                "search": "Search properties:"
+            }
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %}

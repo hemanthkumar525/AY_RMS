@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - RMS{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>Welcome, {{ user.get_full_name|default:user.username }}</h2>
+    </div>
+</div>
+
+{% if user.is_superuser %}
+    <!-- Superadmin Dashboard -->
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Property Owners</h5>
+                    <p class="card-text">Total: {{ property_owners_count }}</p>
+                    <a href="{% url 'admin:accounts_propertyowner_changelist' %}" class="btn btn-primary">Manage Owners</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Properties</h5>
+                    <p class="card-text">Total: {{ properties_count }}</p>
+                    <a href="{% url 'admin:properties_property_changelist' %}" class="btn btn-primary">Manage Properties</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Tenants</h5>
+                    <p class="card-text">Total: {{ tenants_count }}</p>
+                    <a href="{% url 'admin:accounts_tenant_changelist' %}" class="btn btn-primary">Manage Tenants</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% elif user.is_property_owner %}
+    <!-- Property Owner Dashboard -->
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">My Properties</h5>
+                    <p class="card-text">Total: {{ properties_count }}</p>
+                    <a href="{% url 'properties:property_list' %}" class="btn btn-primary">View Properties</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Active Leases</h5>
+                    <p class="card-text">Total: {{ active_leases_count }}</p>
+                    <a href="#" class="btn btn-primary">View Leases</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Pending Payments</h5>
+                    <p class="card-text">Total: {{ pending_payments_count }}</p>
+                    <a href="{% url 'payments:payment_list' %}" class="btn btn-primary">View Payments</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Maintenance Requests -->
+    <div class="row mt-4">
+        <div class="col">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Maintenance Requests</h5>
+                </div>
+                <div class="card-body">
+                    {% if maintenance_requests %}
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Property</th>
+                                        <th>Issue</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for request in maintenance_requests %}
+                                    <tr>
+                                        <td>{{ request.property.title }}</td>
+                                        <td>{{ request.title }}</td>
+                                        <td><span class="badge bg-{{ request.status|lower }}">{{ request.status }}</span></td>
+                                        <td>{{ request.reported_date|date:"M d, Y" }}</td>
+                                        <td>
+                                            <a href="#" class="btn btn-sm btn-primary">View</a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-0">No maintenance requests found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% else %}
+    <!-- Tenant Dashboard -->
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">My Lease</h5>
+                    {% if active_lease %}
+                        <p class="card-text">
+                            Property: {{ active_lease.property.title }}<br>
+                            Start Date: {{ active_lease.start_date|date:"M d, Y" }}<br>
+                            End Date: {{ active_lease.end_date|date:"M d, Y" }}
+                        </p>
+                        <a href="#" class="btn btn-primary">View Details</a>
+                    {% else %}
+                        <p class="card-text text-muted">No active lease found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Payment Status</h5>
+                    {% if next_payment %}
+                        <p class="card-text">
+                            Next Payment: {{ next_payment.amount }}<br>
+                            Due Date: {{ next_payment.due_date|date:"M d, Y" }}
+                        </p>
+                        <a href="{% url 'payments:make_payment' next_payment.id %}" class="btn btn-primary">Make Payment</a>
+                    {% else %}
+                        <p class="card-text text-muted">No pending payments.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Maintenance Requests -->
+    <div class="row mt-4">
+        <div class="col">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">My Maintenance Requests</h5>
+                    <a href="#" class="btn btn-primary btn-sm">New Request</a>
+                </div>
+                <div class="card-body">
+                    {% if maintenance_requests %}
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Issue</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for request in maintenance_requests %}
+                                    <tr>
+                                        <td>{{ request.title }}</td>
+                                        <td><span class="badge bg-{{ request.status|lower }}">{{ request.status }}</span></td>
+                                        <td>{{ request.reported_date|date:"M d, Y" }}</td>
+                                        <td>
+                                            <a href="#" class="btn btn-sm btn-primary">View</a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-0">No maintenance requests found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}
