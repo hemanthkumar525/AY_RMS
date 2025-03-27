@@ -19,6 +19,8 @@
             --info-color: #36b9cc;
             --warning-color: #f6c23e;
             --danger-color: #e74a3b;
+            --new-color-hover: #cb9800;
+            --new-color: #96351e;
         }
         
         body {
@@ -121,7 +123,10 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            
+                            <a class="nav-link" href="{% url 'properties:invoice_list' %}">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                                Invoices
+                            </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'accounts:tenant_list' %}">
@@ -130,9 +135,7 @@
                             </a>
                         </li>
                         {% else %}  {# Tenant #}
-                        <li class="nav-item">
-                            
-                        </li>
+                        
                         <li class="nav-item">
                             
                         </li>
@@ -144,62 +147,67 @@
             <!-- Main Content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <!-- Top Navigation -->
-                <nav class="navbar navbar-expand navbar-light topbar mb-4">
+                <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
                     <div class="container-fluid">
-                        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu">
+                        <a class="navbar-brand" href="{% url 'accounts:dashboard' %}">
+                            <i class="fas fa-home"></i> RMS
+                        </a>
+                        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" 
+                                data-bs-target="#navbarNav" aria-controls="navbarNav" 
+                                aria-expanded="false" aria-label="Toggle navigation">
                             <span class="navbar-toggler-icon"></span>
                         </button>
                         
-                        <ul class="navbar-nav ms-auto">
-                            <!-- Notifications -->
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" 
-                                   data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="fas fa-bell fa-fw"></i>
-                                    {% if notifications_count %}
-                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                                        {{ notifications_count }}
-                                    </span>
-                                    {% endif %}
-                                </a>
-                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                                    {% for notification in notifications %}
-                                    <li>
-                                        <a class="dropdown-item" href="{{ notification.link }}">
-                                            {{ notification.message }}
-                                            <small class="text-muted d-block">{{ notification.created_at|timesince }} ago</small>
+                        <div class="collapse navbar-collapse" id="navbarNav">
+                            <ul class="navbar-nav ms-auto">
+                                {% if user.is_authenticated %}
+                                <!-- Notifications Dropdown -->
+                                <li class="nav-item dropdown me-3">
+                                    <a class="nav-link position-relative" href="#" id="notificationDropdown" 
+                                       role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fas fa-bell"></i>
+                                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-badge" 
+                                              style="display: none;">
+                                        </span>
+                                    </a>
+                                    <div class="dropdown-menu dropdown-menu-end shadow" 
+                                         aria-labelledby="notificationDropdown" 
+                                         style="width: 300px; max-height: 400px; overflow-y: auto;">
+                                        <div class="p-2">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <h6 class="mb-0">Notifications</h6>
+                                                <a href="{% url 'notifications:notification_list' %}" class="text-decoration-none small">View All</a>
+                                            </div>
+                                        </div>
+                                        <div class="notification-list">
+                                            <!-- Notifications will be loaded here via AJAX -->
+                                        </div>
+                                        <div class="dropdown-divider"></div>
+                                        <a href="{% url 'notifications:mark_all_read' %}" class="dropdown-item text-center small mark-all-read">
+                                            Mark all as read
                                         </a>
-                                    </li>
-                                    {% empty %}
-                                    <li><span class="dropdown-item">No new notifications</span></li>
-                                    {% endfor %}
-                                </ul>
-                            </li>
-                            
-                            <!-- User Menu -->
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
-                                   data-bs-toggle="dropdown" aria-expanded="false">
-                                    <span class="me-2 d-none d-lg-inline text-gray-600 small">
-                                        {{ user.get_full_name }}
-                                    </span>
-                                    {% if user.profile_picture %}
-                                    <img class="img-profile rounded-circle" src="{{ user.profile_picture.url }}" width="32" height="32">
-                                    {% else %}
-                                    <i class="fas fa-user-circle fa-fw"></i>
-                                    {% endif %}
-                                </a>
-                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li>
+                                    </div>
+                                </li>
+
+                                <!-- User Menu -->
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                                       data-bs-toggle="dropdown" aria-expanded="false">
+                                        <span class="me-2 d-none d-lg-inline text-gray-600 small">
+                                            {{ user.get_full_name }}
+                                        </span>
+                                        <i class="fas fa-user-circle"></i>
+                                    </a>
+                                    <div class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                                         <a class="dropdown-item" href="{% url 'accounts:logout' %}">
                                             <i class="fas fa-sign-out-alt fa-sm fa-fw me-2 text-gray-400"></i>
                                             Logout
                                         </a>
-                                    </li>
-                                </ul>
-                            </li>
-                        </ul>
+                                    </div>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </div>
                     </div>
                 </nav>
 
@@ -230,5 +238,107 @@
     <script src="https://cdn.datatables.net/1.11.3/js/dataTables.bootstrap5.min.js"></script>
     
     {% block extra_js %}{% endblock %}
+
+    {% block notification_js %}
+    <!-- Notification Scripts -->
+    <script>
+        // Setup CSRF token for AJAX requests
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const csrftoken = getCookie('csrftoken');
+
+        $.ajaxSetup({
+            beforeSend: function(xhr, settings) {
+                if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                    xhr.setRequestHeader("X-CSRFToken", csrftoken);
+                }
+            }
+        });
+
+        function loadNotifications() {
+            $.get("{% url 'notifications:get_notifications_ajax' %}", function(data) {
+                const notificationList = $('.notification-list');
+                if (data.notifications && data.notifications.length > 0) {
+                    let html = '';
+                    data.notifications.forEach(function(notification) {
+                        html += `
+                            <a href="#" class="dropdown-item notification-item" data-notification-id="${notification.id}">
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <i class="fas fa-bell text-primary"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">${notification.title}</h6>
+                                        <p class="mb-0 small text-muted">${notification.message}</p>
+                                        <small class="text-muted">${notification.created_at}</small>
+                                    </div>
+                                </div>
+                            </a>
+                        `;
+                    });
+                    notificationList.html(html);
+                    if (data.unread_count > 0) {
+                        $('.notification-badge').text(data.unread_count).show();
+                    } else {
+                        $('.notification-badge').hide();
+                    }
+                } else {
+                    notificationList.html('<div class="dropdown-item text-center">No new notifications</div>');
+                    $('.notification-badge').hide();
+                }
+            });
+        }
+
+        $(document).ready(function() {
+            // Load notifications on page load
+            loadNotifications();
+            
+            // Refresh notifications every 30 seconds
+            setInterval(loadNotifications, 30000);
+
+            // Mark notification as read when clicked
+            $(document).on('click', '.notification-item', function(e) {
+                e.preventDefault();
+                const notificationId = $(this).data('notification-id');
+                $.ajax({
+                    url: "{% url 'notifications:mark_as_read' 0 %}".replace('0', notificationId),
+                    type: 'POST',
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            loadNotifications();
+                        }
+                    }
+                });
+            });
+
+            // Mark all as read
+            $(document).on('click', '.mark-all-read', function(e) {
+                e.preventDefault();
+                $.ajax({
+                    url: "{% url 'notifications:mark_all_read' %}",
+                    type: 'POST',
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            loadNotifications();
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+    {% endblock %}
 </body>
 </html>

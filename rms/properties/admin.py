@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Property, PropertyImage, LeaseAgreement, PropertyMaintenance
+from .models import *
 
 class PropertyImageInline(admin.TabularInline):
     model = PropertyImage
@@ -19,8 +19,8 @@ class PropertyAdmin(admin.ModelAdmin):
 
 
 class PropertyUnitAdmin(admin.ModelAdmin):
-    list_display = ['property', 'unit_number', 'unit_type', 'monthly_rent', 'is_available']
-    list_filter = ['unit_type', 'is_available', 'bedrooms']
+    list_display = ['property', 'unit_number', 'monthly_rent', 'bedrooms', 'is_available']
+    list_filter = ['is_available', 'bedrooms']
     search_fields = ['property__title', 'unit_number']
 
 class LeaseAgreementAdmin(admin.ModelAdmin):
@@ -38,10 +38,12 @@ class PropertyMaintenanceAdmin(admin.ModelAdmin):
     date_hierarchy = 'reported_date'
 
 class BankAccountAdmin(admin.ModelAdmin):
-    list_display = ('title', 'account_type', 'status_badge', 'mode_badge', 'property')
+    list_display = ('title', 'account_type', 'status', 'account_mode', 'property')
     list_filter = ('status', 'account_type', 'account_mode')
     search_fields = ('title', 'property__title')
 
 admin.site.register(Property, PropertyAdmin)
 admin.site.register(LeaseAgreement, LeaseAgreementAdmin)
 admin.site.register(PropertyMaintenance, PropertyMaintenanceAdmin)
+admin.site.register(PropertyUnit, PropertyUnitAdmin)
+admin.site.register(BankAccount, BankAccountAdmin)

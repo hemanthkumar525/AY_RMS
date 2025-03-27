@@ -2,121 +2,81 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
 
-{% block title %}Generate Invoice - RMS{% endblock %}
+{% block title %}{% if form.instance.pk %}Edit Invoice{% else %}Create New Invoice{% endif %} - RMS{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-10">
         <div class="card shadow">
             <div class="card-header bg-primary text-white py-3">
-                <h4 class="mb-0">Generate Invoice</h4>
+                <h4 class="mb-0">{% if form.instance.pk %}Edit Invoice{% else %}Create New Invoice{% endif %}</h4>
             </div>
             <div class="card-body p-4">
                 <form method="post" id="invoice-form" novalidate>
                     {% csrf_token %}
-                    
-                    <!-- Property and Tenant Selection -->
-                    <h5 class="mb-4">Property and Tenant</h5>
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {{ form.non_field_errors }}
+                    </div>
+                    {% endif %}
+
+                    <!-- Lease Agreement and Invoice Number -->
+                    <h5 class="mb-4">Lease Agreement Details</h5>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            {{ form.property|crispy }}
+                            {{ form.lease_agreement|as_crispy_field }}
                         </div>
                         <div class="col-md-6 mb-3">
-                            {{ form.tenant|crispy }}
+                            {{ form.invoice_number|as_crispy_field }}
                         </div>
                     </div>
 
-                    <!-- Invoice Details -->
-                    <h5 class="mb-4 mt-4">Invoice Details</h5>
+                    <!-- Property Unit and Tenant -->
+                    <h5 class="mb-4 mt-4">Property and Tenant Details</h5>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.property_unit|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.tenant|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <!-- Payment Details -->
+                    <h5 class="mb-4 mt-4">Payment Details</h5>
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                            {{ form.invoice_number|crispy }}
+                            {{ form.amount|as_crispy_field }}
                         </div>
                         <div class="col-md-4 mb-3">
-                            {{ form.issue_date|crispy }}
+                            {{ form.payment_type|as_crispy_field }}
                         </div>
                         <div class="col-md-4 mb-3">
-                            {{ form.due_date|crispy }}
+                            {{ form.due_date|as_crispy_field }}
                         </div>
                     </div>
 
-                    <!-- Charges -->
-                    <h5 class="mb-4 mt-4">Charges</h5>
-                    <div id="charges-container">
-                        <div class="row mb-3 charge-row">
-                            <div class="col-md-5">
-                                {{ form.description|crispy }}
-                            </div>
-                            <div class="col-md-3">
-                                {{ form.amount|crispy }}
-                            </div>
-                            <div class="col-md-3">
-                                {{ form.tax|crispy }}
-                            </div>
-                            <div class="col-md-1 d-flex align-items-end">
-                                <button type="button" class="btn btn-outline-danger mb-3 remove-charge" style="display: none;">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <button type="button" class="btn btn-outline-primary" id="add-charge">
-                            <i class="fas fa-plus"></i> Add Another Charge
-                        </button>
-                    </div>
-
-                    <!-- Summary -->
-                    <div class="card mb-4">
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-8">
-                                    <h5>Summary</h5>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span>Subtotal:</span>
-                                        <span id="subtotal">$0.00</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span>Tax:</span>
-                                        <span id="total-tax">$0.00</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between fw-bold">
-                                        <span>Total:</span>
-                                        <span id="total">$0.00</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Additional Information -->
-                    <h5 class="mb-4">Additional Information</h5>
-                    <div class="row">
-                        <div class="col-md-12 mb-3">
-                            {{ form.notes|crispy }}
-                        </div>
-                    </div>
+                    <!-- Additional Charges -->
+                    <h5 class="mb-4 mt-4">Additional Charges</h5>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            {{ form.payment_terms|crispy }}
+                            {{ form.late_fee|as_crispy_field }}
                         </div>
                         <div class="col-md-6 mb-3">
-                            {{ form.late_fee_terms|crispy }}
+                            {{ form.bank_account|as_crispy_field }}
                         </div>
                     </div>
 
-                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                        <a href="{% url 'payments:invoice_list' %}" class="btn btn-outline-secondary me-2">
+                    <!-- Description -->
+                    <h5 class="mb-4 mt-4">Description</h5>
+                    {{ form.description|as_crispy_field }}
+
+                    <div class="mt-4 d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary me-2" onclick="window.history.back()">
                             Cancel
-                        </a>
-                        <button type="submit" name="action" value="save" class="btn btn-outline-primary me-2">
-                            Save as Draft
                         </button>
-                        <button type="submit" name="action" value="generate" class="btn btn-primary">
-                            Generate Invoice
+                        <button type="submit" class="btn btn-primary">
+                            {% if form.instance.pk %}Update{% else %}Create{% endif %} Invoice
                         </button>
                     </div>
                 </form>
@@ -128,139 +88,39 @@
 
 {% block extra_js %}
 <script>
-    // Initialize datepickers
-    flatpickr("#id_issue_date", {
-        enableTime: false,
-        dateFormat: "Y-m-d",
-        defaultDate: "today"
-    });
-
-    flatpickr("#id_due_date", {
-        enableTime: false,
-        dateFormat: "Y-m-d",
-        minDate: "today"
-    });
-
-    // Dynamic charge rows
-    let chargeCount = 1;
-    
-    document.getElementById('add-charge').addEventListener('click', function() {
-        const container = document.getElementById('charges-container');
-        const template = container.querySelector('.charge-row').cloneNode(true);
-        
-        // Clear values
-        template.querySelectorAll('input').forEach(input => input.value = '');
-        
-        // Show remove button
-        template.querySelector('.remove-charge').style.display = 'block';
-        
-        // Update IDs and names
-        chargeCount++;
-        template.querySelectorAll('input').forEach(input => {
-            const newId = input.id.replace('1', chargeCount);
-            input.id = newId;
-            input.name = newId;
-        });
-        
-        container.appendChild(template);
-        updateCalculations();
-    });
-
-    // Remove charge row
-    document.getElementById('charges-container').addEventListener('click', function(e) {
-        if (e.target.closest('.remove-charge')) {
-            const row = e.target.closest('.charge-row');
-            if (document.querySelectorAll('.charge-row').length > 1) {
-                row.remove();
-                updateCalculations();
-            }
-        }
-    });
-
-    // Auto-populate tenant based on property selection
-    document.getElementById('id_property').addEventListener('change', function(e) {
-        const propertyId = e.target.value;
-        if (propertyId) {
-            fetch(`/api/properties/${propertyId}/tenants/`)
-                .then(response => response.json())
-                .then(data => {
-                    const tenantSelect = document.getElementById('id_tenant');
-                    tenantSelect.innerHTML = '<option value="">---------</option>';
-                    data.forEach(tenant => {
-                        const option = document.createElement('option');
-                        option.value = tenant.id;
-                        option.textContent = tenant.name;
-                        tenantSelect.appendChild(option);
-                    });
-                });
-        }
-    });
-
-    // Calculate totals
-    function updateCalculations() {
-        let subtotal = 0;
-        let totalTax = 0;
-
-        document.querySelectorAll('.charge-row').forEach(row => {
-            const amount = parseFloat(row.querySelector('[id^="id_amount"]').value) || 0;
-            const tax = parseFloat(row.querySelector('[id^="id_tax"]').value) || 0;
-            
-            subtotal += amount;
-            totalTax += (amount * tax / 100);
-        });
-
-        const total = subtotal + totalTax;
-
-        document.getElementById('subtotal').textContent = `$${subtotal.toFixed(2)}`;
-        document.getElementById('total-tax').textContent = `$${totalTax.toFixed(2)}`;
-        document.getElementById('total').textContent = `$${total.toFixed(2)}`;
-    }
-
-    // Add event listeners for calculations
-    document.getElementById('charges-container').addEventListener('input', function(e) {
-        if (e.target.matches('[id^="id_amount"], [id^="id_tax"]')) {
-            updateCalculations();
-        }
-    });
-
-    // Generate invoice number
     document.addEventListener('DOMContentLoaded', function() {
-        const invoiceInput = document.getElementById('id_invoice_number');
-        if (!invoiceInput.value) {
-            const date = new Date();
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-            invoiceInput.value = `INV-${year}${month}-${random}`;
-        }
-    });
+        // Initialize select2 for dropdowns
+        $('.select2').select2({
+            theme: 'bootstrap4',
+            width: '100%'
+        });
 
-    // Form validation
-    document.getElementById('invoice-form').addEventListener('submit', function(e) {
-        const property = document.getElementById('id_property').value;
-        const tenant = document.getElementById('id_tenant').value;
-        const issueDate = document.getElementById('id_issue_date').value;
-        const dueDate = document.getElementById('id_due_date').value;
-
-        if (!property || !tenant || !issueDate || !dueDate) {
-            e.preventDefault();
-            alert('Please fill in all required fields');
-            return;
-        }
-
-        let hasCharges = false;
-        document.querySelectorAll('.charge-row').forEach(row => {
-            const amount = row.querySelector('[id^="id_amount"]').value;
-            if (amount && parseFloat(amount) > 0) {
-                hasCharges = true;
+        // Handle lease agreement change
+        $('#id_lease_agreement').change(function() {
+            var leaseId = $(this).val();
+            if (leaseId) {
+                $.ajax({
+                    url: '{% url "payments:get_lease_details" %}',
+                    data: {
+                        'lease_id': leaseId
+                    },
+                    dataType: 'json',
+                    success: function(data) {
+                        $('#id_property_unit').val(data.property_unit_id).trigger('change');
+                        $('#id_tenant').val(data.tenant_id).trigger('change');
+                        $('#id_amount').val(data.rent_amount);
+                    }
+                });
             }
         });
 
-        if (!hasCharges) {
-            e.preventDefault();
-            alert('Please add at least one charge');
-            return;
-        }
+        // Calculate total amount when amount or late fee changes
+        $('#id_amount, #id_late_fee').on('input', function() {
+            var amount = parseFloat($('#id_amount').val()) || 0;
+            var lateFee = parseFloat($('#id_late_fee').val()) || 0;
+            var total = amount + lateFee;
+            $('#total-amount').text(total.toFixed(2));
+        });
     });
 </script>
 {% endblock %}

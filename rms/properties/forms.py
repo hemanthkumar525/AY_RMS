@@ -209,24 +209,3 @@ class BankAccountForm(forms.ModelForm):
                 ('paypal', 'PayPal'),
                 ('razorpay', 'Razorpay')
             ]
-
-class InvoiceForm(forms.ModelForm):
-    class Meta:
-        model = Invoice
-        fields = [
-            'amount',
-            'payment_type',
-            'description',
-            'due_date',
-            'late_fee',
-            'bank_account'
-        ]
-        widgets = {
-            'due_date': forms.DateInput(attrs={'type': 'date'}),
-            'description': forms.Textarea(attrs={'rows': 3}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field in self.fields.values():
-            field.widget.attrs.update({'class': 'form-control'})

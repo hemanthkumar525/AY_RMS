@@ -2,15 +2,17 @@ from django.db import models
 from accounts.models import PropertyOwner, Tenant, CustomUser
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
+from django.db import transaction
+import uuid
 
 # Create your models here.
 
 class Property(models.Model):
     PROPERTY_TYPE_CHOICES = (
-        ('apartment', 'Apartment'),
-        ('house', 'House'),
+        ('residential', 'Residential'),
         ('commercial', 'Commercial'),
-        ('office', 'Office Space'),
+        
     )
     
     owner = models.ForeignKey(PropertyOwner, on_delete=models.CASCADE)
@@ -134,6 +136,23 @@ class LeaseAgreement(models.Model):
     property_unit = models.ForeignKey(PropertyUnit, on_delete=models.SET_NULL, null=True, blank=True, related_name='lease_agreements')
     created_at = models.DateTimeField(auto_now_add=True)
     
+    def next_payment_date(self):
+        """Calculate the next payment due date"""
+        today = timezone.now().date()
+        current_month = today.replace(day=self.rent_due_day)
+        
+        if today > current_month:
+            # If we've passed the due day this month, payment is due next month
+            if current_month.month == 12:
+                next_payment = current_month.replace(year=current_month.year + 1, month=1)
+            else:
+                next_payment = current_month.replace(month=current_month.month + 1)
+        else:
+            # If we haven't reached the due day yet, payment is due this month
+            next_payment = current_month
+            
+        return next_payment
+
     def __str__(self):
         return f"Lease for {self.property.title} - {self.tenant.user.get_full_name()}"
 
@@ -184,55 +203,3 @@ class PropertyMaintenance(models.Model):
     
     def __str__(self):
         return f"{self.title} - {self.property.title}"
-
-
-class Invoice(models.Model):
-    STATUS_CHOICES = (
-        ('pending', 'Pending'),
-        ('paid', 'Paid'),
-        ('overdue', 'Overdue'),
-        ('cancelled', 'Cancelled'),
-    )
-
-    PAYMENT_TYPE_CHOICES = (
-        ('rent', 'Rent'),
-        ('security_deposit', 'Security Deposit'),
-        ('maintenance', 'Maintenance'),
-        ('utility', 'Utility'),
-        ('other', 'Other'),
-    )
-
-    lease_agreement = models.ForeignKey(LeaseAgreement, on_delete=models.CASCADE, related_name='invoices')
-    property = models.ForeignKey(Property, on_delete=models.CASCADE)
-    tenant = models.ForeignKey('accounts.Tenant', on_delete=models.CASCADE)
-    invoice_number = models.CharField(max_length=50, unique=True)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_type = models.CharField(max_length=20, choices=PAYMENT_TYPE_CHOICES)
-    description = models.TextField(blank=True)
-    due_date = models.DateField()
-    issue_date = models.DateField(auto_now_add=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    payment_date = models.DateField(null=True, blank=True)
-    late_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    bank_account = models.ForeignKey(BankAccount, on_delete=models.SET_NULL, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def save(self, *args, **kwargs):
-        # Generate invoice number if not set
-        if not self.invoice_number:
-            last_invoice = Invoice.objects.order_by('-id').first()
-            invoice_id = (last_invoice.id + 1) if last_invoice else 1
-            self.invoice_number = f'INV-{self.property.id}-{invoice_id:06d}'
-        
-        # Calculate total amount including late fee
-        self.total_amount = self.amount + self.late_fee
-        
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f'{self.invoice_number} - {self.tenant.user.get_full_name()}'
-
-    class Meta:
-        ordering = ['-created_at']

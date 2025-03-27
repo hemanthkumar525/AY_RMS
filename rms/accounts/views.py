@@ -14,7 +14,7 @@ from .forms import (
 )
 from .models import  PropertyOwner, Tenant, Subscription, PropertyOwnerSubscription
 from properties.models import LeaseAgreement, Property, TenantProperty
-from payments.models import Payment
+from payments.models import Payment,Invoice
 from django.utils import timezone
 from datetime import timedelta
 from django.core import signing
@@ -224,16 +224,22 @@ def dashboard(request):
             tenant = Tenant.objects.get(user=user)
             context['tenant'] = tenant
             context['lease_agreements'] = LeaseAgreement.objects.filter(tenant=tenant)
-            context['payments'] = Payment.objects.filter(
-                lease_agreement__tenant=tenant
-            ).order_by('-due_date')
-            context['pending_payments'] = Payment.objects.filter(
-                lease_agreement__tenant=tenant,
-                status='PENDING'
-            ).count()
-            context['recent_payments'] = Payment.objects.filter(
+            
+            # Get invoices instead of payments
+            context['invoices'] = Invoice.objects.filter(
                 lease_agreement__tenant=tenant
             ).order_by('-created_at')[:5]
+            
+            context['pending_payments'] = Invoice.objects.filter(
+                lease_agreement__tenant=tenant,
+                status='pending'
+            ).count()
+            
+            context['payments'] = Invoice.objects.filter(
+                lease_agreement__tenant=tenant,
+                status='paid'
+            )
+            
         except Tenant.DoesNotExist:
             messages.warning(request, 'Please complete your tenant profile.')
             return redirect('accounts:complete_profile')
@@ -428,56 +434,66 @@ def subscription_view(request):
 def payment_successful(request):
     session_id = request.GET.get('session_id')
     subscription_id = request.GET.get('subscription_id')
-    print(f"Payment successful - Session ID: {session_id}, Subscription ID: {subscription_id}")  # Debug log
+    logger.debug(f"Payment success initiated - Session: {session_id}, Subscription: {subscription_id}")
     
     try:
-        # Verify the payment session
         session = stripe.checkout.Session.retrieve(session_id)
-        print(f"Stripe session status: {session.payment_status}")  # Debug log
+        logger.debug(f"Stripe session retrieved - Status: {session.payment_status}")
         
         if session.payment_status == 'paid':
-            # Get the subscription details
             subscription = Subscription.objects.get(id=subscription_id)
             property_owner = PropertyOwner.objects.get(user=request.user)
-            print(f"Found subscription: {subscription.name} for property owner: {property_owner}")  # Debug log
+            logger.debug(f"Processing subscription - Plan: {subscription.name}, Owner: {property_owner}")
             
-            # Calculate end date (30 days from now for monthly plan)
             end_date = timezone.now() + timezone.timedelta(days=30)
             
             try:
-                # Create or update subscription record
-                owner_subscription, created = PropertyOwnerSubscription.objects.update_or_create(
+                owner_subscription, created = PropertyOwnerSubscription.objects.get_or_create(
                     property_owner=property_owner,
-                    defaults={
-                        'subscription': subscription,
-                        'status': 'active',
-                        'end_date': end_date,
-                        'payment_id': session.payment_intent,
-                        'auto_renew': True
-                    }
+                    defaults={'subscription': subscription}
                 )
-                print(f"{'Created' if created else 'Updated'} subscription: {owner_subscription}")  # Debug log
+                logger.debug(f"Subscription {'created' if created else 'existing'} - ID: {owner_subscription.id}")
                 
-                messages.success(request, 'Payment successful! Your subscription is now active.')
+                update_needed = not created or owner_subscription.payment_status != 'completed'
+                logger.debug(f"Update needed: {update_needed} - Created: {created}, Current Status: {owner_subscription.payment_status}")
+                
+                if update_needed:
+                    owner_subscription.subscription = subscription
+                    owner_subscription.status = 'active'
+                    owner_subscription.end_date = end_date
+                    owner_subscription.payment_id = session.payment_intent
+                    owner_subscription.payment_status = 'completed'
+                    owner_subscription.payment_amount = subscription.price
+                    owner_subscription.payment_date = timezone.now()
+                    owner_subscription.stripe_payment_intent_id = session.payment_intent
+                    owner_subscription.stripe_customer_id = session.customer
+                    owner_subscription.payment_method = 'stripe'
+                    owner_subscription.auto_renew = True
+                    
+                    logger.debug("Attempting to save subscription with values:")
+                    logger.debug(f"Payment Intent: {session.payment_intent}")
+                    logger.debug(f"Customer ID: {session.customer}")
+                    logger.debug(f"Amount: {subscription.price}")
+                    
+                    owner_subscription.save()
+                    logger.info("Subscription successfully updated in database")
+                    
+                messages.success(request, 'Subscription payment successful!')
                 return redirect('accounts:dashboard')
+                
             except Exception as e:
-                print(f"Error creating subscription record: {str(e)}")  # Debug log
-                raise
+                logger.error(f"Database error: {str(e)}", exc_info=True)
+                messages.error(request, 'Error processing subscription. Please contact support.')
+                return redirect('accounts:payment')
+                
         else:
-            print(f"Payment not successful: {session.payment_status}")  # Debug log
+            logger.warning(f"Payment failed - Status: {session.payment_status}")
             messages.error(request, 'Payment was not successful. Please try again.')
             return redirect('accounts:payment')
-    except stripe.error.StripeError as e:
-        print(f"Stripe error: {str(e)}")  # Debug log
-        messages.error(request, f'Error processing payment: {str(e)}')
-        return redirect('accounts:payment')
-    except (Subscription.DoesNotExist, PropertyOwner.DoesNotExist) as e:
-        print(f"Database error: {str(e)}")  # Debug log
-        messages.error(request, 'Invalid subscription or property owner.')
-        return redirect('accounts:payment')
+            
     except Exception as e:
-        print(f"Unexpected error: {str(e)}")  # Debug log
-        messages.error(request, f'An error occurred: {str(e)}')
+        logger.critical(f"Critical error: {str(e)}", exc_info=True)
+        messages.error(request, 'An unexpected error occurred. Please try again.')
         return redirect('accounts:payment')
 
 @csrf_exempt

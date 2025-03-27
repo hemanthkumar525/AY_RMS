@@ -11,6 +11,7 @@ from django.core.paginator import Paginator
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 import csv
 import stripe
 from rms.settings import *
@@ -19,15 +20,16 @@ from datetime import datetime, timedelta
 
 stripe.api_key = STRIPE_SECRET_KEY
 
-from .models import Payment, PaymentDocument, PaymentHistory
+from .models import Payment, Invoice
 from .forms import (
     PaymentForm, 
     PaymentFilterForm, 
-    MakePaymentForm, 
     BulkUploadForm,
-    PaymentConfirmationForm
+    PaymentConfirmationForm,
+    InvoiceForm,
+    InvoiceFilterForm
 )
-from properties.models import Property, LeaseAgreement
+from properties.models import Property, LeaseAgreement, PropertyUnit
 from accounts.models import CustomUser, PropertyOwner, Tenant
 
 class PaymentListView(LoginRequiredMixin, ListView):
@@ -157,6 +159,7 @@ class PaymentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         
         messages.success(self.request, 'Payment updated successfully.')
         return super().form_valid(form)
+
 @login_required
 def create_payment_intent(request, payment_id):
     payment = get_object_or_404(Payment, id=payment_id)
@@ -523,3 +526,290 @@ def payment_detail(request, pk):
     }
 
     return render(request, 'payments/payment_detail.html', context)
+
+@login_required
+def invoice_list(request):
+    """View for listing invoices"""
+    if hasattr(request.user, 'tenant'):
+        invoices = Invoice.objects.filter(tenant=request.user.tenant)
+    elif hasattr(request.user, 'propertyowner'):
+        invoices = Invoice.objects.filter(property__owner=request.user.propertyowner)
+    else:
+        invoices = Invoice.objects.none()
+    
+    return render(request, 'payments/invoice_list.html', {
+        'invoices': invoices
+    })
+
+@login_required
+def invoice_detail(request, pk):
+    """View for showing invoice details"""
+    invoice = get_object_or_404(Invoice, pk=pk)
+    
+    # Check permissions
+    if not (hasattr(request.user, 'tenant') and request.user.tenant == invoice.tenant) and \
+       not (hasattr(request.user, 'propertyowner') and request.user.propertyowner == invoice.property.owner):
+        return HttpResponseForbidden("You don't have permission to view this invoice")
+    
+    return render(request, 'payments/invoice_detail.html', {
+        'invoice': invoice,
+        'STRIPE_PUBLIC_KEY': settings.STRIPE_PUBLIC_KEY
+    })
+
+class InvoiceListView(LoginRequiredMixin, ListView):
+    model = Invoice
+    template_name = 'payments/invoice_list.html'
+    context_object_name = 'invoices'
+    paginate_by = 10
+
+    def get_queryset(self):
+        queryset = Invoice.objects.all()
+        
+        # Filter based on user role
+        if self.request.user.is_property_owner:
+            queryset = queryset.filter(property__owner=self.request.user.propertyowner)
+        elif self.request.user.is_tenant:
+            queryset = queryset.filter(tenant=self.request.user.tenant)
+
+        # Apply filters from form
+        form = InvoiceFilterForm(self.request.GET, user=self.request.user)
+        if form.is_valid():
+            status = form.cleaned_data.get('status')
+            payment_type = form.cleaned_data.get('payment_type')
+            date_from = form.cleaned_data.get('date_from')
+            date_to = form.cleaned_data.get('date_to')
+            property = form.cleaned_data.get('property')
+            tenant = form.cleaned_data.get('tenant')
+
+            if status:
+                queryset = queryset.filter(status=status)
+            if payment_type:
+                queryset = queryset.filter(payment_type=payment_type)
+            if date_from:
+                queryset = queryset.filter(due_date__gte=date_from)
+            if date_to:
+                queryset = queryset.filter(due_date__lte=date_to)
+            if property:
+                queryset = queryset.filter(property=property)
+            if tenant:
+                queryset = queryset.filter(tenant__user__email__icontains=tenant)
+
+        return queryset.order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter_form'] = InvoiceFilterForm(self.request.GET, user=self.request.user)
+        return context
+
+class InvoiceDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
+    model = Invoice
+    template_name = 'payments/invoice_detail.html'
+    context_object_name = 'invoice'
+
+    def test_func(self):
+        invoice = self.get_object()
+        if self.request.user.is_superuser:
+            return True
+        elif self.request.user.is_property_owner:
+            return invoice.property.owner == self.request.user.propertyowner
+        elif self.request.user.is_tenant:
+            return invoice.tenant == self.request.user.tenant
+        return False
+
+class InvoiceCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
+    model = Invoice
+    form_class = InvoiceForm
+    template_name = 'payments/invoice_form.html'
+    success_url = reverse_lazy('payments:invoice_list')
+
+    def test_func(self):
+        return self.request.user.is_superuser or self.request.user.is_property_owner
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        invoice = form.save(commit=False)
+        invoice.property = form.cleaned_data['lease_agreement'].property
+        invoice.save()
+        
+        # Create notification for tenant
+        create_notification(
+            recipient=invoice.tenant.user,
+            notification_type='payment_due',
+            title='New Invoice Created',
+            message=f'A new invoice of ${invoice.total_amount} has been created for {invoice.property.name}.',
+            related_object=invoice
+        )
+        
+        messages.success(self.request, 'Invoice created successfully.')
+        return super().form_valid(form)
+
+class InvoiceUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+    model = Invoice
+    form_class = InvoiceForm
+    template_name = 'payments/invoice_form.html'
+    success_url = reverse_lazy('payments:invoice_list')
+
+    def test_func(self):
+        invoice = self.get_object()
+        if self.request.user.is_superuser:
+            return True
+        elif self.request.user.is_property_owner:
+            return invoice.property.owner == self.request.user.propertyowner
+        return False
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Invoice updated successfully.')
+        return super().form_valid(form)
+
+@login_required
+def get_lease_details(request):
+    """AJAX view to get lease agreement details"""
+    lease_id = request.GET.get('lease_id')
+    lease = get_object_or_404(LeaseAgreement, id=lease_id)
+    
+    if request.user.is_property_owner and lease.property.owner != request.user.propertyowner:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+    data = {
+        'property_unit_id': lease.property_unit.id if lease.property_unit else None,
+        'tenant_id': lease.tenant.id if lease.tenant else None,
+        'rent_amount': float(lease.rent_amount) if lease.rent_amount else 0,
+    }
+    return JsonResponse(data)
+
+@login_required
+def tenant_make_payment(request, pk):
+    invoice = get_object_or_404(Invoice, id=pk)
+    
+    # Validate permissions
+    if not request.user.is_tenant or invoice.tenant.user != request.user:
+        messages.error(request, "Unauthorized payment attempt")
+        return redirect('properties:invoice_detail', pk=pk)
+
+    try:
+        # Ensure Stripe configuration exists
+        if not invoice.bank_account or invoice.bank_account.account_type != 'Stripe':
+            invoice.bank_account = BankAccount.objects.get(
+                property=invoice.property,
+                account_type='Stripe',
+                status='active'
+            )
+            invoice.save()
+
+        # Create new Stripe session if needed
+        if not invoice.stripe_checkout_id:
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+
+            success_url = request.build_absolute_uri(
+                reverse('properties:invoice_detail', kwargs={'pk': invoice.pk})
+            )
+            cancel_url = request.build_absolute_uri(
+                reverse('properties:invoice_detail', kwargs={'pk': invoice.pk})
+            )
+
+            session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price_data': {
+                        'currency': 'usd',
+                        'unit_amount': int(invoice.total_amount * 100),
+                        'product_data': {
+                            'name': f'Invoice #{invoice.invoice_number}',
+                            'description': invoice.description,
+                        },
+                    },
+                    'quantity': 1,
+                }],
+                mode='payment',
+                success_url=success_url,
+                cancel_url=cancel_url,
+                metadata={'invoice_id': invoice.id}
+            )
+
+            invoice.stripe_checkout_id = session.id
+            invoice.stripe_payment_intent_id = session.payment_intent
+            invoice.payment_url = session.url
+            invoice.save()
+
+        return redirect(invoice.payment_url)
+
+    except Exception as e:
+        messages.error(request, f'Payment processing error: {str(e)}')
+        logger.error(f'Stripe payment error for invoice {invoice.id}: {str(e)}')
+        return redirect('properties:invoice_detail', pk=pk)
+
+@login_required
+def payment_success(request, pk):
+    """Handle successful payment"""
+    invoice = get_object_or_404(Invoice, pk=pk)
+    
+    if not hasattr(request.user, 'tenant') or request.user.tenant != invoice.tenant:
+        return HttpResponseForbidden("You don't have permission to view this page")
+    
+    try:
+        # Verify payment with Stripe
+        if invoice.stripe_checkout_id:
+            session = stripe.checkout.Session.retrieve(invoice.stripe_checkout_id)
+            if session.payment_status == 'paid':
+                invoice.mark_as_paid()
+                messages.success(request, "Payment successful! Your invoice has been marked as paid.")
+            else:
+                messages.warning(request, "Payment is still processing. Please check back later.")
+        else:
+            messages.error(request, "No payment information found for this invoice.")
+    
+    except Exception as e:
+        messages.error(request, f"Error verifying payment: {str(e)}")
+
+        create_notification(
+        recipient=invoice.tenant.user,
+        notification_type='payment_received',
+        title='Payment Successful',
+        message=f'Your payment of ${invoice.total_amount} for {invoice.property.name} has been processed successfully.',
+        related_object=invoice
+    )
+    
+    # Create notification for property owner
+    create_notification(
+        recipient=invoice.property.owner.user,
+        notification_type='payment_received',
+        title='Payment Received',
+        message=f'Payment of ${invoice.total_amount} received from {invoice.tenant.user.get_full_name()} for {invoice.property.name}.',
+        related_object=invoice
+    )
+    
+    return redirect('payments:invoice_detail', pk=invoice.pk)
+
+@require_POST
+def stripe_webhook(request):
+    """Handle Stripe webhook events"""
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+        
+        if event.type == 'checkout.session.completed':
+            session = event.data.object
+            invoice_id = session.metadata.get('invoice_id')
+            
+            if invoice_id:
+                invoice = Invoice.objects.get(id=invoice_id)
+                invoice.stripe_payment_intent_id = session.payment_intent
+                invoice.mark_as_paid()
+        
+        return JsonResponse({'status': 'success'})
+    
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)

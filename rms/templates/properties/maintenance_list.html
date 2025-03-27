@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Maintenance Requests</h1>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <i class="fas fa-tools me-1"></i>
+            Maintenance Requests
+            {% if request.user.is_tenant %}
+            <a href="{% url 'properties:maintenance_create' %}" class="btn btn-light btn-sm float-end">
+                <i class="fas fa-plus"></i> New Request
+            </a>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if maintenance_requests %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            {% if request.user.is_property_owner %}
+                            <th>Property</th>
+                            <th>Reported By</th>
+                            {% endif %}
+                            <th>Description</th>
+                            <th>Reported Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for request in maintenance_requests %}
+                        <tr>
+                            <td>#{{ request.id }}</td>
+                            {% if request.user.is_property_owner %}
+                            <td>{{ request.property.name }}</td>
+                            <td>{{ request.reported_by.get_full_name }}</td>
+                            {% endif %}
+                            <td>{{ request.description|truncatechars:40 }}</td>
+                            <td>{{ request.reported_date|date:"M d, Y" }}</td>
+                            <td>
+                                <span class="badge 
+                                    {% if request.status == 'completed' %}bg-success
+                                    {% elif request.status == 'in_progress' %}bg-primary
+                                    {% else %}bg-warning{% endif %}">
+                                    {{ request.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="{% url 'properties:maintenance_detail' pk=request.id %}" 
+                                   class="btn btn-sm btn-info">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <p class="lead">No maintenance requests found</p>
+                {% if request.user.is_tenant %}
+                <a href="{% url 'properties:maintenance_request_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Create First Request
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
